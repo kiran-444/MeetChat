@@ -1,38 +1,35 @@
 import React from "react";
 import "../App.css";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function Landing() {
-  return (
-    <div className="landingPageContainer">
-      <nav>
-        <div className="navHeader">
-          <h2>MeetChat</h2>
-        </div>
-        <div className="navList">
-          <p>Join as Guest</p>
-          <p>Register</p>
-          <div role="button">
-            <p>Login</p>
-          </div>
-        </div>
-      </nav>
+    const router = useNavigate();
 
-      <div className="landingMainContainer">
+    return (
+        <div className="landingPageContainer">
+            <nav className="navBar">
+                <div className="navHeader" onClick={() => router("/")}>
+                    <h2>MeetChat</h2>
+                </div>
+                <div className="navList">
+                    <div onClick={() => router("/123")} role="button" className="navBtn loginBtn">Join as Guest</div>
+                    <div onClick={() => router("/auth")} role="button" className="navBtn loginBtn">Register</div>
+                    <div onClick={() => router("/auth")} role="button" className="navBtn loginBtn">Login</div>
+                </div>
+            </nav>
 
-        <div>
-          <h2>Connect with your loved ones</h2>
-        <p>Cover a distance by MeetChat</p>
-       <div role="button">
-         <Link to={"/auth"} >Get started</Link>
-       </div>
+            <div className="landingMainContainer">
+                <div className="textContent">
+                    <h2>Connect with your loved ones</h2>
+                    <p>Cover the distance with MeetChat</p>
+                    <div role="button" className="getStartedBtn">
+                        <Link to={"/auth"}>Get started</Link>
+                    </div>
+                </div>
+                <div className="imageContainer">
+                    <img src="/mobile.png" alt="App Preview" />
+                </div>
+            </div>
         </div>
-
-       <div>
-       <img src="/mobile.png" alt="" />
-       </div>
-       
-      </div>
-    </div>
-  );
+    );
 }
