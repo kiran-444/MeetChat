@@ -13,9 +13,8 @@ import ChatIcon from "@mui/icons-material/Chat";
 import { ConnectWithoutContact } from "@mui/icons-material";
 import styles from "../styles/videoComponent.module.css";
 import { useNavigate } from "react-router-dom";
-import server from "../environment";
 
-const server_url = server;
+const server_url = "http://localhost:8000";
 
 var connections = {};
 
@@ -54,29 +53,13 @@ export default function VideoMeet() {
 
   const getPermissions = async () => {
     try {
-      const videoPermission = await navigator.mediaDevices.getUserMedia({
-        video: true,
-      });
-      if (videoPermission) {
-        setVideoAvailable(true);
-      } else {
-        setVideoAvailable(false);
-      }
+      const videoPermission = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoPermission) { setVideoAvailable(true); } else { setVideoAvailable(false); }
 
-      const audioPermission = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
-      if (audioPermission) {
-        setAudioAvailable(true);
-      } else {
-        setAudioAvailable(false);
-      }
+      const audioPermission = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (audioPermission) { setAudioAvailable(true); } else { setAudioAvailable(false); }
 
-      if (navigator.mediaDevices.getDisplayMedia) {
-        setScreenAvailable(true);
-      } else {
-        setScreenAvailable(false);
-      }
+      if (navigator.mediaDevices.getDisplayMedia) { setScreenAvailable(true); } else { setScreenAvailable(false); }
 
       if (videoAvailable || audioAvailable) {
         const userMediaStream = await navigator.mediaDevices.getUserMedia({
@@ -95,16 +78,10 @@ export default function VideoMeet() {
     }
   };
 
-  useEffect(() => {
-    getPermissions();
-  }, []);
+  useEffect(() => { getPermissions(); }, []);
 
   let getUserMediaSuccess = (stream) => {
-    try {
-      window.localStream.getTracks().forEach((track) => track.stop());
-    } catch (e) {
-      console.log(e);
-    }
+    try { window.localStream.getTracks().forEach((track) => track.stop()); } catch (e) { console.log(e); }
 
     window.localStream = stream;
     localVideoRef.current.srcObject = stream;
@@ -113,50 +90,30 @@ export default function VideoMeet() {
       if (id === socketIdRef.current) continue;
       connections[id].addStream(window.localStream);
       connections[id].createOffer().then((description) => {
-        connections[id]
-          .setLocalDescription(description)
-          .then(() => {
-            socketRef.current.emit(
-              "signal",
-              id,
-              JSON.stringify({ sdp: connections[id].localDescription }),
-            );
-          })
-          .catch((e) => console.log(e));
+        connections[id].setLocalDescription(description).then(() => {
+          socketRef.current.emit("signal", id, JSON.stringify({ sdp: connections[id].localDescription }));
+        }).catch((e) => console.log(e));
       });
     }
-    stream.getTracks().forEach(
-      (track) =>
-        (track.onended = () => {
-          setVideo(false);
-          setAudio(false);
-          try {
-            let tracks = localVideoRef.current.srcObject.getTracks();
-            tracks.forEach((track) => track.stop());
-          } catch (e) {
-            console.log(e);
-          }
-          let blackSilence = (...args) =>
-            new MediaStream([black(...args), silence()]);
-          window.localStream = blackSilence();
-          localVideoRef.current.srcObject = window.localStream;
-          for (let id in connections) {
-            connections[id].addStream(window.localStream);
-            connections[id].createOffer().then((description) => {
-              connections[id]
-                .setLocalDescription(description)
-                .then(() => {
-                  socketRef.current.emit(
-                    "signal",
-                    id,
-                    JSON.stringify({ sdp: connections[id].localDescription }),
-                  );
-                })
-                .catch((e) => console.log(e));
-            });
-          }
-        }),
-    );
+    stream.getTracks().forEach((track) => (track.onended = () => {
+      setVideo(false);
+      setAudio(false);
+      try {
+        let tracks = localVideoRef.current.srcObject.getTracks();
+        tracks.forEach((track) => track.stop());
+      } catch (e) { console.log(e); }
+      let blackSilence = (...args) => new MediaStream([black(...args), silence()]);
+      window.localStream = blackSilence();
+      localVideoRef.current.srcObject = window.localStream;
+      for (let id in connections) {
+        connections[id].addStream(window.localStream);
+        connections[id].createOffer().then((description) => {
+          connections[id].setLocalDescription(description).then(() => {
+            socketRef.current.emit("signal", id, JSON.stringify({ sdp: connections[id].localDescription }));
+          }).catch((e) => console.log(e));
+        });
+      }
+    }));
   };
 
   let silence = () => {
@@ -169,10 +126,7 @@ export default function VideoMeet() {
   };
 
   let black = ({ width = 640, height = 480 } = {}) => {
-    let canvas = Object.assign(document.createElement("canvas"), {
-      width,
-      height,
-    });
+    let canvas = Object.assign(document.createElement("canvas"), { width, height });
     canvas.getContext("2d").fillRect(0, 0, width, height);
     let stream = canvas.captureStream();
     return Object.assign(stream.getVideoTracks()[0], { enabled: false });
@@ -189,51 +143,30 @@ export default function VideoMeet() {
       try {
         let tracks = localVideoRef.current.srcObject.getTracks();
         tracks.forEach((track) => track.stop());
-      } catch (e) {
-        console.log(e);
-      }
+      } catch (e) { console.log(e); }
     }
   };
 
   useEffect(() => {
-    if (video !== undefined && audio !== undefined) {
-      getUserMedia();
-    }
+    if (video !== undefined && audio !== undefined) { getUserMedia(); }
   }, [audio, video]);
 
   let gotMessageFromServer = (fromId, message) => {
     var signal = JSON.parse(message);
     if (fromId !== socketIdRef.current) {
       if (signal.sdp) {
-        connections[fromId]
-          .setRemoteDescription(new RTCSessionDescription(signal.sdp))
-          .then(() => {
-            if (signal.sdp.type === "offer") {
-              connections[fromId]
-                .createAnswer()
-                .then((description) => {
-                  connections[fromId]
-                    .setLocalDescription(description)
-                    .then(() => {
-                      socketRef.current.emit(
-                        "signal",
-                        fromId,
-                        JSON.stringify({
-                          sdp: connections[fromId].localDescription,
-                        }),
-                      );
-                    })
-                    .catch((e) => console.log(e));
-                })
-                .catch((e) => console.log(e));
-            }
-          })
-          .catch((e) => console.log(e));
+        connections[fromId].setRemoteDescription(new RTCSessionDescription(signal.sdp)).then(() => {
+          if (signal.sdp.type === "offer") {
+            connections[fromId].createAnswer().then((description) => {
+              connections[fromId].setLocalDescription(description).then(() => {
+                socketRef.current.emit("signal", fromId, JSON.stringify({ sdp: connections[fromId].localDescription }));
+              }).catch((e) => console.log(e));
+            }).catch((e) => console.log(e));
+          }
+        }).catch((e) => console.log(e));
       }
       if (signal.ice) {
-        connections[fromId]
-          .addIceCandidate(new RTCIceCandidate(signal.ice))
-          .catch((e) => console.log(e));
+        connections[fromId].addIceCandidate(new RTCIceCandidate(signal.ice)).catch((e) => console.log(e));
       }
     }
   };
@@ -257,51 +190,38 @@ export default function VideoMeet() {
       });
       socketRef.current.on("user-joined", (id, clients) => {
         clients.forEach((socketListId) => {
-          connections[socketListId] = new RTCPeerConnection(
-            peerConfigConnections,
-          );
+          connections[socketListId] = new RTCPeerConnection(peerConfigConnections);
           connections[socketListId].onicecandidate = (event) => {
             if (event.candidate !== null) {
-              socketRef.current.emit(
-                "signal",
-                socketListId,
-                JSON.stringify({ ice: event.candidate }),
-              );
+              socketRef.current.emit("signal", socketListId, JSON.stringify({ ice: event.candidate }));
             }
           };
           connections[socketListId].onaddstream = (event) => {
-            let videoExists = videoRef.current.find(
-              (video) => video.socketId === socketListId,
-            );
-            if (videoExists) {
-              setVideos((videos) => {
-                const updatedVideos = videos.map((video) =>
-                  video.socketId === socketListId
-                    ? { ...video, stream: event.stream }
-                    : video,
+            // Fix 1: Never add our own stream to the remote grid
+            if (socketListId === socketIdRef.current) return;
+
+            // Fix 2: Use functional updater so the find() always sees latest state,
+            // preventing duplicate tiles when state batching behaves differently on mobile
+            setVideos((prevVideos) => {
+              const alreadyExists = prevVideos.find((v) => v.socketId === socketListId);
+              if (alreadyExists) {
+                const updatedVideos = prevVideos.map((v) =>
+                  v.socketId === socketListId ? { ...v, stream: event.stream } : v
                 );
                 videoRef.current = updatedVideos;
                 return updatedVideos;
-              });
-            } else {
-              let newVideo = {
-                socketId: socketListId,
-                stream: event.stream,
-                autoPlay: true,
-                playsInline: true,
-              };
-              setVideos((videos) => {
-                const updatedVideos = [...videos, newVideo];
+              } else {
+                const newVideo = { socketId: socketListId, stream: event.stream, autoPlay: true, playsInline: true };
+                const updatedVideos = [...prevVideos, newVideo];
                 videoRef.current = updatedVideos;
                 return updatedVideos;
-              });
-            }
+              }
+            });
           };
           if (window.localStream !== undefined && window.localStream !== null) {
             connections[socketListId].addStream(window.localStream);
           } else {
-            let blackSilence = (...args) =>
-              new MediaStream([black(...args), silence()]);
+            let blackSilence = (...args) => new MediaStream([black(...args), silence()]);
             window.localStream = blackSilence();
             connections[socketListId].addStream(window.localStream);
           }
@@ -309,22 +229,11 @@ export default function VideoMeet() {
         if (id === socketIdRef.current) {
           for (let id2 in connections) {
             if (id2 === socketIdRef.current) continue;
-            try {
-              connections[id2].addStream(window.localStream);
-            } catch (err) {
-              console.log(err);
-            }
+            try { connections[id2].addStream(window.localStream); } catch (err) { console.log(err); }
             connections[id2].createOffer().then((description) => {
-              connections[id2]
-                .setLocalDescription(description)
-                .then(() => {
-                  socketRef.current.emit(
-                    "signal",
-                    id2,
-                    JSON.stringify({ sdp: connections[id2].localDescription }),
-                  );
-                })
-                .catch((e) => console.log(e));
+              connections[id2].setLocalDescription(description).then(() => {
+                socketRef.current.emit("signal", id2, JSON.stringify({ sdp: connections[id2].localDescription }));
+              }).catch((e) => console.log(e));
             });
           }
         }
@@ -346,54 +255,33 @@ export default function VideoMeet() {
     connectToSocketServer();
   };
 
-  let handleVideo = () => {
-    setVideo(!video);
-  };
-  let handleAudio = () => {
-    setAudio(!audio);
-  };
+  let handleVideo = () => { setVideo(!video); };
+  let handleAudio = () => { setAudio(!audio); };
 
   let getDisplayMediaSuccess = (stream) => {
-    try {
-      window.localStream.getTracks().forEach((track) => track.stop());
-    } catch (e) {
-      console.log(e);
-    }
+    try { window.localStream.getTracks().forEach((track) => track.stop()); } catch (e) { console.log(e); }
     window.localStream = stream;
     localVideoRef.current.srcObject = stream;
     for (let id in connections) {
       if (id === socketIdRef.current) continue;
       connections[id].addStream(window.localStream);
       connections[id].createOffer().then((description) => {
-        connections[id]
-          .setLocalDescription(description)
-          .then(() => {
-            socketRef.current.emit(
-              "signal",
-              id,
-              JSON.stringify({ sdp: connections[id].localDescription }),
-            );
-          })
-          .catch((e) => console.log(e));
+        connections[id].setLocalDescription(description).then(() => {
+          socketRef.current.emit("signal", id, JSON.stringify({ sdp: connections[id].localDescription }));
+        }).catch((e) => console.log(e));
       });
     }
-    stream.getTracks().forEach(
-      (track) =>
-        (track.onended = () => {
-          setScreen(false);
-          try {
-            let tracks = localVideoRef.current.srcObject.getTracks();
-            tracks.forEach((track) => track.stop());
-          } catch (e) {
-            console.log(e);
-          }
-          let blackSilence = (...args) =>
-            new MediaStream([black(...args), silence()]);
-          window.localStream = blackSilence();
-          localVideoRef.current.srcObject = window.localStream;
-          getUserMedia();
-        }),
-    );
+    stream.getTracks().forEach((track) => (track.onended = () => {
+      setScreen(false);
+      try {
+        let tracks = localVideoRef.current.srcObject.getTracks();
+        tracks.forEach((track) => track.stop());
+      } catch (e) { console.log(e); }
+      let blackSilence = (...args) => new MediaStream([black(...args), silence()]);
+      window.localStream = blackSilence();
+      localVideoRef.current.srcObject = window.localStream;
+      getUserMedia();
+    }));
   };
 
   let getDisplayMedia = () => {
@@ -408,15 +296,9 @@ export default function VideoMeet() {
     }
   };
 
-  useEffect(() => {
-    if (screen !== undefined) {
-      getDisplayMedia();
-    }
-  }, [screen]);
+  useEffect(() => { if (screen !== undefined) { getDisplayMedia(); } }, [screen]);
 
-  let handleScreen = () => {
-    setScreen(!screen);
-  };
+  let handleScreen = () => { setScreen(!screen); };
 
   let sendMessage = () => {
     socketRef.current.emit("chat-message", message, username);
@@ -427,9 +309,7 @@ export default function VideoMeet() {
     try {
       let tracks = localVideoRef.current.srcObject.getTracks();
       tracks.forEach((track) => track.stop());
-    } catch (e) {
-      console.log(e);
-    }
+    } catch (e) { console.log(e); }
     routeTo("/home");
   };
 
@@ -442,14 +322,10 @@ export default function VideoMeet() {
           <div className={styles.lobbyCard}>
             <div className={styles.lobbyHeader}>
               <div className={styles.lobbyLogo}>
-                <ConnectWithoutContact
-                  style={{ color: "white", fontSize: "1.6rem" }}
-                />
+                <ConnectWithoutContact style={{ color: "white", fontSize: "1.6rem" }} />
               </div>
               <h2 className={styles.lobbyTitle}>Join the room</h2>
-              <p className={styles.lobbySubtitle}>
-                Enter your name to get started
-              </p>
+              <p className={styles.lobbySubtitle}>Enter your name to get started</p>
             </div>
 
             <div className={styles.lobbyPreview}>
@@ -465,13 +341,6 @@ export default function VideoMeet() {
                 variant="outlined"
                 fullWidth
                 onKeyDown={(e) => e.key === "Enter" && connect()}
-                sx={{
-                  "& .MuiInputLabel-root": { color: "white" },
-                  "& .MuiInputLabel-root.Mui-focused": { color: "white" },
-                  "& .MuiInputBase-input": {
-                    color: "white",
-                  },
-                }}
               />
               <Button
                 variant="contained"
@@ -498,6 +367,7 @@ export default function VideoMeet() {
       ) : (
         /* ── Meet Room ── */
         <div className={styles.meetVideoContainer}>
+
           {/* Chat panel */}
           {showModal ? (
             <div className={styles.chatRoom}>
@@ -562,21 +432,14 @@ export default function VideoMeet() {
 
             {screenAvailable === true ? (
               <IconButton onClick={handleScreen} style={{ color: "white" }}>
-                {screen === true ? (
-                  <ScreenShareIcon />
-                ) : (
-                  <StopScreenShareIcon />
-                )}
+                {screen === true ? <ScreenShareIcon /> : <StopScreenShareIcon />}
               </IconButton>
             ) : (
               <></>
             )}
 
             <Badge badgeContent={newMessages} max={999} color="secondary">
-              <IconButton
-                onClick={() => setModal(!showModal)}
-                style={{ color: "white" }}
-              >
+              <IconButton onClick={() => setModal(!showModal)} style={{ color: "white" }}>
                 <ChatIcon />
               </IconButton>
             </Badge>
@@ -590,9 +453,14 @@ export default function VideoMeet() {
             muted
           />
 
-          {/* Remote participants grid */}
+          {/* Remote participants grid — deduplicated and local stream excluded */}
           <div className={styles.conferenceView}>
-            {videos.map((video) => (
+            {[...new Map(
+                videos
+                  .filter((v) => v.socketId !== socketIdRef.current)
+                  .map((v) => [v.socketId, v])
+              ).values()
+            ].map((video) => (
               <div key={video.socketId}>
                 <video
                   data-socket={video.socketId}
@@ -602,6 +470,7 @@ export default function VideoMeet() {
                     }
                   }}
                   autoPlay
+                  playsInline
                 />
               </div>
             ))}
