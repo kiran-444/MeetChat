@@ -13,7 +13,6 @@ import ChatIcon from "@mui/icons-material/Chat";
 import { ConnectWithoutContact } from "@mui/icons-material";
 import styles from "../styles/videoComponent.module.css";
 import { useNavigate } from "react-router-dom";
-
 import server from "../environment";
 
 const server_url = server;
@@ -44,16 +43,20 @@ export default function VideoMeet() {
   let [messages, setMessages] = useState([]);
   let [newMessages, setNewMessages] = useState(3);
 
-  let [askForRoomId, setAskForRoomId] = useState(true);
-  let [roomId, setRoomId] = useState("");
+  // Only skip the Room ID screen if enterRoom() explicitly stored the room
+  // in sessionStorage. Avoids false-positives when home page navigates to
+  // this component with an unrelated path (e.g. "join as guest" button).
+  const storedRoomId = sessionStorage.getItem("meetRoomId") || "";
+  const hasStoredRoom = storedRoomId !== "";
+
+  let [askForRoomId, setAskForRoomId] = useState(!hasStoredRoom);
+  let [roomId, setRoomId] = useState(hasStoredRoom ? storedRoomId : "");
   let [askForUsername, setAskForUsername] = useState(true);
   let [username, setUsername] = useState("");
 
   const videoRef = useRef([]);
 
   let [videos, setVideos] = useState([]);
-
-  // ─── ALL ORIGINAL LOGIC — UNTOUCHED ─────────────────────────────
 
   const getPermissions = async () => {
     try {
@@ -260,8 +263,6 @@ export default function VideoMeet() {
       });
       socketRef.current.on("user-joined", (id, clients) => {
         clients.forEach((socketListId) => {
-          // Fix: only create a new peer connection if one doesn't already exist.
-          // Recreating overwrites and destroys a live connection when a 3rd user joins.
           if (!connections[socketListId]) {
             connections[socketListId] = new RTCPeerConnection(
               peerConfigConnections,
@@ -277,11 +278,8 @@ export default function VideoMeet() {
             }
           };
           connections[socketListId].onaddstream = (event) => {
-            // Fix 1: Never add our own stream to the remote grid
             if (socketListId === socketIdRef.current) return;
 
-            // Fix 2: Use functional updater so the find() always sees latest state,
-            // preventing duplicate tiles when state batching behaves differently on mobile
             setVideos((prevVideos) => {
               const alreadyExists = prevVideos.find(
                 (v) => v.socketId === socketListId,
@@ -352,8 +350,9 @@ export default function VideoMeet() {
 
   let enterRoom = () => {
     if (roomId.trim() === "") return;
-    // Push URL silently — avoids React Router remounting this component
-    // which would reset all state back to the room-ID screen.
+    // Store room so if component remounts it skips this screen
+    sessionStorage.setItem("meetRoomId", roomId.trim());
+    // Update URL silently so window.location.href carries room for socket join-call
     window.history.pushState(null, "", "/" + roomId.trim());
     setAskForRoomId(false);
   };
@@ -462,10 +461,11 @@ export default function VideoMeet() {
       } catch (e) {}
       delete connections[id];
     });
+
+    sessionStorage.removeItem("meetRoomId");
     routeTo("/home");
   };
 
-  // ─── RENDER ─────────────────────────────────────────────────────
   return (
     <div>
       {askForRoomId === true ? (
@@ -547,13 +547,6 @@ export default function VideoMeet() {
                 variant="outlined"
                 fullWidth
                 onKeyDown={(e) => e.key === "Enter" && connect()}
-                sx={{
-                  "& .MuiInputLabel-root": { color: "white" },
-                  "& .MuiInputLabel-root.Mui-focused": { color: "white" },
-                  "& .MuiInputBase-input": {
-                    color: "white",
-                  },
-                }}
               />
               <Button
                 variant="contained"
