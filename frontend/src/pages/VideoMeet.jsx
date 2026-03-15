@@ -497,6 +497,7 @@ export default function VideoMeet() {
                 fullWidth
                 placeholder="e.g. my-room-123"
                 onKeyDown={(e) => e.key === "Enter" && enterRoom()}
+                sx={{ "& .MuiInputLabel-root": { color: "white" }, "& .MuiInputLabel-root.Mui-focused": { color: "white" }, "& .MuiInputBase-input": { color: "white" } }}
               />
               <Button
                 variant="contained"
@@ -547,6 +548,11 @@ export default function VideoMeet() {
                 variant="outlined"
                 fullWidth
                 onKeyDown={(e) => e.key === "Enter" && connect()}
+                sx={{
+                  "& .MuiInputLabel-root": { color: "white" },
+                  "& .MuiInputLabel-root.Mui-focused": { color: "white" },
+                  "& .MuiInputBase-input": { color: "white" },
+                }}
               />
               <Button
                 variant="contained"
